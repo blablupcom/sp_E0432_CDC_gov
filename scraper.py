@@ -85,40 +85,54 @@ def convert_mth_strings ( mth_string ):
 
 #### VARIABLES 1.0
 
-entity_id = "E2632_BDC_gov"
-url = "https://www.broadland.gov.uk/info/200197/spending_and_transparency/339/council_spending_over_250"
+entity_id = "E0432_CDC_gov"
+url = "http://www.chiltern.gov.uk/Expenditure-over-500"
 errors = 0
 data = []
 
 
 #### READ HTML 1.0
-
-html = urllib2.urlopen(url)
-soup = BeautifulSoup(html, 'lxml')
+import requests
+html = requests.get(url)
+soup = BeautifulSoup(html.text, "lxml")
 
 #### SCRAPE DATA
 
-links = soup.find('div', 'editor').find_all('a', href=True)
-for link in links:
-    if 'http' not in link['href']:
-        year_url = 'https://www.broadland.gov.uk' + link['href']
+year_links = soup.find('div', 'a-body a-body--default').find_all('a', 'a_body__link a-panel__link')
+for year_link in year_links:
+    if 'http' not in year_link['href']:
+        year_url = 'http://www.chiltern.gov.uk'+year_link['href']
     else:
-        year_url = link['href']
+        year_url = year_link['href']
     year_html = urllib2.urlopen(year_url)
     year_soup = BeautifulSoup(year_html, 'lxml')
-    blocks = year_soup.find_all('span', 'download-listing__file-tag download-listing__file-tag--type')
+    blocks = year_soup.find_all('li', 'panel__item panel__item--excel')+ year_soup.find_all('li', 'panel__item panel__item--csv')
     for block in blocks:
-        if 'CSV' in block.text:
-            url = block.find_next('a')['href']
-            if 'http' not in url:
-                url = 'https://www.broadland.gov.uk' + url
-            else:
-                url = url
-            file_name = block.find_next('a')['aria-label']
-            csvMth = file_name.split()[-2][:3]
-            csvYr = file_name.split()[-1]
-            csvMth = convert_mth_strings(csvMth.upper())
-            data.append([csvYr, csvMth, url])
+        url = block.find('a')['href']
+        if 'http' not in url:
+            url = 'http://www.chiltern.gov.uk'+url
+        else:
+            url = url
+        file_name = block.text.strip()
+        csvMth = csvYr = ''
+        if 'Jan to Mar' in file_name or 'Jan - Mar' in file_name:
+            csvMth = 'Q1'
+            csvYr = file_name.split('\n')[0][-4:]
+        if 'Apr - Jun' in file_name or 'Apr to Jun' in file_name:
+            csvMth = 'Q2'
+            csvYr = file_name.split('\n')[0][-4:]
+        if 'Oct to Dec' in file_name or 'Oct - Dec' in file_name or 'Oct Dec' in file_name:
+            csvMth = 'Q4'
+            csvYr = file_name.split('\n')[0][-4:]
+        if 'Jul - Sep' in file_name or 'July - Sept' in file_name or 'Jul to Sep' in file_name:
+            csvMth = 'Q3'
+            csvYr = file_name.split('\n')[0][-4:]
+
+        if not csvMth and not csvYr:
+            csvMth = file_name.split('\n')[0].split()[-2][:3]
+            csvYr = file_name.split('\n')[0].split()[-1]
+        csvMth = convert_mth_strings(csvMth.upper())
+        data.append([csvYr, csvMth, url])
 
 
 #### STORE DATA 1.0
